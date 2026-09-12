@@ -93,6 +93,26 @@ const SERIES_DB: Record<
   },
 };
 
+// قاعدة معرفة للعناوين المزيفة → الأصل (reverse lookup)
+const REVERSE_LOOKUP: Record<string, string> = {
+  "its_wrong_youre_my_stepson": `**الموقع المنتج:** BangBros – Big Tit Creampie (bangbros.com)
+
+**العنوان الحقيقي:** August Taylor Creampied by Her Step-Son (صدر في 13 ديسمبر 2018)
+
+**أسماء الممثلين:** August Taylor + Juan El Caballo Loco
+
+**الفئات (Categories):**  
+Hardcore, Couples - Boy/Girl, Hair: Brunettes, Theme: Family Roleplay, Cumshot: Creampie
+
+**ملخص داخل الموقع (Official Summary):**  
+August Taylor is one horny milf. She loves to fuck, doesn’t matter where or with who. This week, it was her step son’s turn. She pulled his cock out in the kitchen and began choking on it, not caring that her husband was just in the other room. They then fucked in the kitchen as the rest of the family was having breakfast at the dinner table. Eventually, they snuck upstairs to continue fucking properly. August’s pussy got penetrated by her step son’s cock in several different positions until she instructed him to cum inside her pussy.
+
+**بيانات إضافية:**  
+المدة: 26:24  
+تاريخ الإصدار: 13 ديسمبر 2018  
+الرابط الرسمي: https://www.bangbrosnetwork.com/videos/8908421/august-taylor-creampied-by-her-step-son`,
+};
+
 function normalize(text: string): string {
   return text
     .toLowerCase()
@@ -108,7 +128,6 @@ function findSeries(message: string): string | null {
       return key;
     }
   }
-  // aliases
   if (norm.includes("bratty") || norm.includes("براتي")) return "bratty sis";
   if (norm.includes("moms teach") || norm.includes("ماما تعلم")) return "moms teach sex";
   if (norm.includes("family strokes") || norm.includes("فاميلي ستروكس")) return "family strokes";
@@ -119,11 +138,38 @@ function findSeries(message: string): string | null {
   return null;
 }
 
+function detectPirateLink(message: string): string | null {
+  const lower = message.toLowerCase();
+  if (
+    lower.includes("hqporner.com") ||
+    lower.includes("eporner.com") ||
+    lower.includes("xvideos.com") ||
+    lower.includes("xnxx.com") ||
+    lower.includes("pornhd") ||
+    lower.includes("spankbang")
+  ) {
+    const match = message.match(/(?:hdporn\/|video-|\/)([a-z0-9_\-]+?)(?:\.html|$|\/|\?)/i);
+    if (match && match[1]) {
+      return match[1].toLowerCase().replace(/-/g, "_");
+    }
+    return "unknown_pirate";
+  }
+  return null;
+}
+
 function generateReply(message: string): string {
+  // أولاً: لو فيه لينك قرصنة → reverse lookup
+  const pirateKey = detectPirateLink(message);
+  if (pirateKey) {
+    if (REVERSE_LOOKUP[pirateKey]) {
+      return `لقيت الأصل! 🔍\n\n${REVERSE_LOOKUP[pirateKey]}\n\nعايز أبحث عن لينك تاني؟ ابعت اللينك.`;
+    }
+    return `فهمت إنك بعت لينك من موقع قرصنة.\n\nهحاول أحدد العنوان الحقيقي والاستوديو الأصلي.\n\nحالياً عندي قاعدة معرفة محدودة للعناوين الشائعة. ابعت العنوان المزيف أو اسم الممثلة + سنة تقريبية عشان أدور أدق.\n\nأو جرب لينك تاني معروف.`;
+  }
+
   const seriesKey = findSeries(message);
   const lower = message.toLowerCase();
 
-  // طلب أحدث الحلقات
   if (lower.includes("أحدث") || lower.includes("جديد") || lower.includes("latest") || lower.includes("new")) {
     if (seriesKey && SERIES_DB[seriesKey]) {
       const titles = SERIES_DB[seriesKey].titles.slice(-4).reverse();
@@ -131,7 +177,6 @@ function generateReply(message: string): string {
     }
   }
 
-  // طلب عنوان معين
   if (lower.includes("عنوان") || lower.includes("scene") || lower.includes("حلقة") || lower.includes("ep")) {
     if (seriesKey && SERIES_DB[seriesKey]) {
       const titles = SERIES_DB[seriesKey].titles;
@@ -139,20 +184,17 @@ function generateReply(message: string): string {
     }
   }
 
-  // اقتراحات عامة أو حسب ممثلة/سيناريو
   if (seriesKey && SERIES_DB[seriesKey]) {
     const data = SERIES_DB[seriesKey];
     const titles = data.titles;
-    return `فاهم طلبك، سلسلة ${seriesKey.toUpperCase()}.\n\nإليك 6-8 عناوين حقيقية/شائعة من السلسلة:\n\n${titles.map((t, i) => `${i + 1}. ${t}`).join("\n")}\n\n${data.note ? `ملاحظة: ${data.note}` : ""}\n\nعايز:\n- تفاصيل عن عنوان معين؟\n- أحدث الحلقات؟\n- اقتراحات حسب ممثلة أو سيناريو (prank / sleepover / holiday)؟\nقولي.`;
+    return `فاهم طلبك، سلسلة ${seriesKey.toUpperCase()}.\n\nإليك 6-8 عناوين حقيقية/شائعة من السلسلة:\n\n${titles.map((t, i) => `${i + 1}. ${t}`).join("\n")}\n\n${data.note ? `ملاحظة: ${data.note}` : ""}\n\nعايز:\n- تفاصيل عن عنوان معين؟\n- أحدث الحلقات؟\n- اقتراحات حسب ممثلة أو سيناريو (prank / sleepover / holiday)؟\n- أو ابعت لينك من hqporner/eporner عشان أدور على الأصل\nقولي.`;
   }
 
-  // لو مفيش سلسلة معروفة
   if (lower.includes("اقتراح") || lower.includes("suggest") || lower.includes("قائمة")) {
-    return `حالياً عندي بيانات جيدة عن السلاسل دي:\n\n• Bratty Sis\n• Moms Teach Sex\n• Family Strokes\n• Daughter Swap\n• My Family Pies\n• SisLovesMe\n• SpyFam\n\nاكتب اسم واحدة منهم + نوع الطلب (اقتراحات / أحدث / عنوان معين) وأديك اللي عندي.\n\nلو سلسلة تانية قولي اسمها وأشوف لو في معلومات.`;
+    return `حالياً عندي بيانات جيدة عن السلاسل دي:\n\n• Bratty Sis\n• Moms Teach Sex\n• Family Strokes\n• Daughter Swap\n• My Family Pies\n• SisLovesMe\n• SpyFam\n\nاكتب اسم واحدة منهم + نوع الطلب (اقتراحات / أحدث / عنوان معين)\n\nأو ابعت لينك من موقع قرصنة (hqporner وغيرها) وأدور لك على العنوان الأصلي والاستوديو.`;
   }
 
-  // رد افتراضي
-  return `فاهم إنك بتدور على محتوى من السلاسل الإباحية.\n\nقولي اسم السلسلة بوضوح (مثلاً: Bratty Sis أو Moms Teach Sex) وإيه اللي محتاجه بالظبط:\n1. اقتراحات عناوين\n2. أحدث الحلقات\n3. عنوان معين\n4. حسب ممثلة أو سيناريو\n\nهرد عليك بنفس الأسلوب المباشر.`;
+  return `فاهم إنك بتدور على محتوى من السلاسل الإباحية.\n\nقولي اسم السلسلة بوضوح (مثلاً: Bratty Sis أو Moms Teach Sex) وإيه اللي محتاجه بالظبط:\n1. اقتراحات عناوين\n2. أحدث الحلقات\n3. عنوان معين\n4. حسب ممثلة أو سيناريو\n5. **ابعت لينك من hqporner / eporner عشان أدور على الأصل الحقيقي**\n\nهرد عليك بنفس الأسلوب المباشر.`;
 }
 
 export async function POST(req: NextRequest) {
@@ -164,7 +206,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ reply: "اكتب رسالة عشان أقدر أساعدك." });
     }
 
-    // محاكاة تأخير بحث بسيط
     await new Promise((r) => setTimeout(r, 600 + Math.random() * 800));
 
     const reply = generateReply(message);
